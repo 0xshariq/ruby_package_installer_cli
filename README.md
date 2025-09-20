@@ -1,10 +1,16 @@
-# 📦 Package Installer CLI
+# � Package Installer CLI - Ruby Gem
 
-[![npm version](https://img.shields.io/npm/v/@0xshariq/package-installer.svg)](https://www.npmjs.com/package/@0xshariq/package-installer)
+[![Gem Version](https://badge.fury.io/rb/package-installer-cli.svg)](https://badge.fury.io/rb/package-installer-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Ruby](https://img.shields.io/badge/ruby-%3E%3D2.6.0-red.svg)](https://www.ruby-lang.org/)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
-A **cross-platform, interactive CLI** to scaffold modern web application templates with support for multiple frameworks, languages, and development tools. Create production-ready projects in seconds!
+A **Ruby wrapper** around the Package Installer CLI - a cross-platform, interactive CLI to scaffold modern web application templates with support for multiple frameworks, languages, and development tools. Create production-ready projects in seconds!
+
+## 📋 Prerequisites
+
+- **Ruby** >= 2.6.0
+- **Node.js** >= 18.0.0 (required for the underlying CLI)
 
 ## 🚀 Quick Features
 
@@ -27,6 +33,28 @@ A **cross-platform, interactive CLI** to scaffold modern web application templat
 
 ## 📥 Installation
 
+### Via RubyGems
+
+```bash
+gem install package-installer-cli
+```
+
+### Via Bundler
+
+Add this line to your application's Gemfile:
+
+```ruby
+gem 'package-installer-cli'
+```
+
+And then execute:
+
+```bash
+bundle install
+```
+
+### Alternative: NPM (Original)
+
 ```bash
 # Using npm
 npm install -g @0xshariq/package-installer
@@ -34,7 +62,7 @@ npm install -g @0xshariq/package-installer
 # Using yarn
 yarn global add @0xshariq/package-installer
 
-# Using pnpm (recommended)
+# Using pnpm
 pnpm add -g @0xshariq/package-installer
 ```
 
@@ -92,9 +120,10 @@ pi upgrade-cli
 
 ## 🎯 System Requirements
 
-- **Node.js**: 18.0.0 or higher
+- **Ruby**: >= 2.6.0 (for the gem wrapper)
+- **Node.js**: >= 18.0.0 (required for the underlying CLI)
 - **Operating Systems**: Windows, macOS, Linux
-- **Package Managers**: npm, yarn, or pnpm
+- **Package Managers**: npm, yarn, or pnpm (for Node.js projects)
 - **Git**: Required for project initialization
 
 ## 🐛 Troubleshooting
@@ -102,7 +131,17 @@ pi upgrade-cli
 ### Quick Fixes
 
 ```bash
-# Clear cache and reinstall
+# Ruby Gem Issues
+gem uninstall package-installer-cli
+gem install package-installer-cli
+
+# Check if Node.js is available
+node --version
+
+# Test the Ruby wrapper
+pi --help
+
+# Original NPM method (if Ruby gem fails)
 npm cache clean --force
 npm install -g @0xshariq/package-installer
 
@@ -123,10 +162,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- **NPM Package**: [@0xshariq/package-installer](https://www.npmjs.com/package/@0xshariq/package-installer)
-- **GitHub Repository**: [package-installer-cli](https://github.com/0xshariq/package-installer-cli)
-- **Issues & Feedback**: [GitHub Issues](https://github.com/0xshariq/package-installer-cli/issues)
+- **Ruby Gem**: [package-installer-cli](https://rubygems.org/gems/package-installer-cli)
+- **Original NPM Package**: [@0xshariq/package-installer](https://www.npmjs.com/package/@0xshariq/package-installer)
+- **GitHub Repository**: [ruby_package_installer_cli](https://github.com/0xshariq/ruby_package_installer_cli)
+- **Original CLI Repository**: [package-installer-cli](https://github.com/0xshariq/package-installer-cli)
+- **Issues & Feedback**: [GitHub Issues](https://github.com/0xshariq/ruby_package_installer_cli/issues)
 
 ---
+
+💎 **Note**: This Ruby gem is a wrapper around the Node.js implementation. The actual CLI logic is executed via Node.js, so Node.js must be installed on your system.
 
 **Happy coding! 🚀** Create something amazing with Package Installer CLI.
