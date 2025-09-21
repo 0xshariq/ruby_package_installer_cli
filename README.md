@@ -53,19 +53,6 @@ And then execute:
 bundle install
 ```
 
-### Alternative: NPM (Original)
-
-```bash
-# Using npm
-npm install -g @0xshariq/package-installer
-
-# Using yarn
-yarn global add @0xshariq/package-installer
-
-# Using pnpm
-pnpm add -g @0xshariq/package-installer
-```
-
 ## 🎯 Quick Start
 
 ```bash
@@ -141,13 +128,6 @@ node --version
 # Test the Ruby wrapper
 pi --help
 
-# Original NPM method (if Ruby gem fails)
-npm cache clean --force
-npm install -g @0xshariq/package-installer
-
-# Use npx if global installation fails
-npx @0xshariq/package-installer create my-app
-
 # Check CLI status
 pi doctor
 ```
@@ -163,7 +143,6 @@ This project is licensed under the MIT License - see the [LICENSE](https://githu
 ## 🔗 Links
 
 - **Ruby Gem**: [package-installer-cli](https://rubygems.org/gems/package-installer-cli)
-- **Original NPM Package**: [@0xshariq/package-installer](https://www.npmjs.com/package/@0xshariq/package-installer)
 - **GitHub Repository**: [ruby_package_installer_cli](https://github.com/0xshariq/ruby_package_installer_cli)
 - **Original CLI Repository**: [package-installer-cli](https://github.com/0xshariq/package-installer-cli)
 - **Issues & Feedback**: [GitHub Issues](https://github.com/0xshariq/ruby_package_installer_cli/issues)

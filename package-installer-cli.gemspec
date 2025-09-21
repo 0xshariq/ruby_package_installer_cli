@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name          = "package-installer-cli"
-  spec.version       = "3.2.0"
+  spec.version       = "1.0.0"
   spec.authors       = ["sharique"]
   spec.email         = ["khanshariq92213@gmail.com"]
 
@@ -16,12 +16,18 @@ Gem::Specification.new do |spec|
   spec.metadata["bug_tracker_uri"] = "https://github.com/0xshariq/ruby_package_installer_cli/issues"
 
   # Specify which files should be added to the gem when it is released.
-  # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
-  spec.files = Dir.chdir(File.expand_path(__dir__)) do
-    `git ls-files -z`.split("\x0").reject do |f|
-      (f == __FILE__) || f.match(%r{\A(?:(?:bin|test|spec|features)/|\.(?:git|travis|circleci)|appveyor)})
-    end
-  end
+  spec.files = Dir.glob([
+    "lib/**/*",
+    "exe/*",
+    "dist/**/*",
+    "features/**/*",
+    "templates/**/*",
+    "template.json",
+    "package.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE*"
+  ]).select { |f| File.file?(f) }
   
   spec.bindir        = "exe"
   spec.executables   = ["pi", "package-installer"]
