@@ -4,7 +4,7 @@ require 'open3'
 require 'json'
 
 module PackageInstallerCli
-  VERSION = "3.2.0"
+  VERSION = "1.1.0"
   
   class << self
     def run(args = ARGV)
