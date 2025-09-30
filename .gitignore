@@ -28,6 +28,7 @@ node_modules/
 
 # Build artifacts (but keep dist/ for the CLI)
 build/
+dist/
 out/
 
 # Package files
