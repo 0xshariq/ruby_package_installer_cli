@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name          = "package-installer-cli"
-  spec.version       = "1.3.3"
+  spec.version       = "1.4.0"
   spec.authors       = ["sharique"]
   spec.email         = ["khanshariq92213@gmail.com"]
 
