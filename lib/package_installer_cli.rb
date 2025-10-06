@@ -1,44 +1,35 @@
 #!/usr/bin/env ruby
 
-require 'open3'
-require 'json'
-
 module PackageInstallerCli
-  VERSION = "1.2.0"
+  VERSION = "2.0.0"
   
   class << self
     def run(args = ARGV)
-      # Check if Node.js is available
-      unless node_available?
-        puts "❌ Error: Node.js is required but not found."
-        puts "Please install Node.js (>= 18.0.0) from https://nodejs.org/"
+      # Get the path to the bundle-standalone pi executable
+      standalone_pi_path = File.join(gem_root, 'bundle-standalone', 'pi')
+      
+      # Check if bundle-standalone pi exists
+      unless File.exist?(standalone_pi_path)
+        puts "❌ Error: Standalone pi command not found at #{standalone_pi_path}"
+        puts "Please ensure the package is properly installed with bundled dependencies."
         exit 1
       end
       
-      # Check Node.js version
-      node_version = get_node_version
-      if node_version && !compatible_node_version?(node_version)
-        puts "⚠️  Warning: Node.js version #{node_version} detected."
-        puts "Recommended: Node.js >= 18.0.0"
-        puts "Some features may not work correctly."
-        puts
-      end
-      
-      # Get the path to the dist/index.js file relative to this gem
-      cli_path = File.join(gem_root, 'dist', 'index.js')
-      
-      unless File.exist?(cli_path)
-        puts "❌ Error: CLI files not found at #{cli_path}"
-        puts "Please ensure the package is properly installed."
+      # Make sure the pi file is executable
+      unless File.executable?(standalone_pi_path)
+        puts "❌ Error: Standalone pi command is not executable"
+        puts "Run: chmod +x #{standalone_pi_path}"
         exit 1
       end
       
-      # Execute the Node.js CLI with the provided arguments
+      # Set up environment for bundle-standalone
+      setup_standalone_environment
+      
+      # Execute the standalone pi command with all arguments
       begin
-        exec('node', cli_path, *args)
-      rescue Errno::ENOENT
-        puts "❌ Error: Failed to execute Node.js command."
-        puts "Please ensure Node.js is properly installed and accessible."
+        exec(standalone_pi_path, *args)
+      rescue Errno::ENOENT => e
+        puts "❌ Error: Failed to execute standalone pi command: #{e.message}"
         exit 1
       rescue SystemExit => e
         exit e.status
@@ -51,32 +42,58 @@ module PackageInstallerCli
     private
     
     def gem_root
-      File.expand_path('..', __dir__)
-    end
-    
-    def node_available?
-      system('node --version > /dev/null 2>&1')
-    end
-    
-    def get_node_version
-      stdout, stderr, status = Open3.capture3('node --version')
-      if status.success?
-        stdout.strip.gsub(/^v/, '')
-      else
-        nil
-      end
-    rescue
-      nil
-    end
-    
-    def compatible_node_version?(version)
+      # Try multiple methods to find the gem root directory
+      # Method 1: Standard relative path from this file
+      standard_root = File.expand_path('..', __dir__)
+      return standard_root if valid_gem_root?(standard_root)
+      
+      # Method 2: Use Gem specification if available
       begin
-        # Simple version comparison for major version >= 18
-        major_version = version.split('.').first.to_i
-        major_version >= 18
-      rescue
-        false
+        gem_spec = Gem::Specification.find_by_name('package-installer-cli')
+        return gem_spec.gem_dir if gem_spec && valid_gem_root?(gem_spec.gem_dir)
+      rescue Gem::LoadError
+        # Gem not found via specification
       end
+      
+      # Method 3: Search through gem paths
+      gem_paths = Gem.path + [Gem.default_dir]
+      gem_paths.each do |gem_path|
+        potential_dirs = Dir.glob(File.join(gem_path, 'gems', 'package-installer-cli-*'))
+        potential_dirs.each do |dir|
+          return dir if valid_gem_root?(dir)
+        end
+      end
+      
+      # Method 4: Try bundler context (for local installations)
+      if defined?(Bundler) && Bundler.rubygems.loaded_specs('package-installer-cli')
+        spec = Bundler.rubygems.loaded_specs('package-installer-cli')
+        return spec.gem_dir if spec && valid_gem_root?(spec.gem_dir)
+      end
+      
+      # Fallback: return the standard path
+      standard_root
+    end
+    
+    def valid_gem_root?(path)
+      return false unless path && File.directory?(path)
+      # Check if bundle-standalone directory exists
+      File.directory?(File.join(path, 'bundle-standalone'))
+    end
+    
+    def setup_standalone_environment
+      bundle_standalone_path = File.join(gem_root, 'bundle-standalone')
+      
+      # Set NODE_PATH to include bundle-standalone node_modules if it exists
+      node_modules_path = File.join(bundle_standalone_path, 'node_modules')
+      if File.directory?(node_modules_path)
+        ENV['NODE_PATH'] = "#{node_modules_path}:#{ENV['NODE_PATH']}"
+      end
+      
+      # Change to bundle-standalone directory for execution context
+      Dir.chdir(bundle_standalone_path) if File.directory?(bundle_standalone_path)
+    rescue => e
+      # Continue if we can't change directory or set environment
+      puts "⚠️  Warning: Could not setup standalone environment: #{e.message}"
     end
   end
 end

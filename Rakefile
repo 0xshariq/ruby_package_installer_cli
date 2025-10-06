@@ -28,32 +28,23 @@ task :prepare_release => [:clean, :build] do
   puts "📦 To publish to RubyGems, run: gem push package-installer-cli-*.gem"
 end
 
-desc "Check if Node.js dependencies are available"
+desc "Check if bundled dependencies are available"
 task :check_deps do
-  puts "🔍 Checking dependencies..."
+  puts "🔍 Checking bundled dependencies..."
   
-  # Check if Node.js is available
-  if system('node --version > /dev/null 2>&1')
-    node_version = `node --version`.strip
-    puts "✅ Node.js found: #{node_version}"
+  # Check if vendor/bundle exists
+  if File.directory?('vendor/bundle')
+    puts "✅ Bundled dependencies found at vendor/bundle"
   else
-    puts "❌ Node.js not found. Please install Node.js >= 18.0.0"
+    puts "❌ Bundled dependencies not found. Please run 'bundle install --deployment'"
     exit 1
   end
   
-  # Check if dist/index.js exists
-  if File.exist?('dist/index.js')
-    puts "✅ CLI files found at dist/index.js"
-  else
-    puts "❌ CLI files not found. Please run 'npm run build' first"
-    exit 1
-  end
-  
-  puts "🎉 All dependencies are ready!"
+  puts "🎉 All bundled dependencies are ready!"
 end
 
-desc "Test the CLI wrapper"
+desc "Test the CLI"
 task :test_cli => :check_deps do
-  puts "🧪 Testing CLI wrapper..."
+  puts "🧪 Testing CLI..."
   system('ruby exe/pi --help')
 end

@@ -1,0 +1,21 @@
+#!/bin/bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Try bundled CLI first (includes all packages, fastest)
+if [ -f "$DIR/cli-with-packages.js" ]; then
+    node "$DIR/cli-with-packages.js" "$@" 2>/dev/null
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 0 ] || [ $EXIT_CODE -eq 130 ]; then
+        exit $EXIT_CODE
+    fi
+fi
+
+# Fallback to dist/index.js (Plan B)
+if [ -f "$DIR/dist/index.js" ]; then
+    exec node "$DIR/dist/index.js" "$@"
+fi
+
+# If both fail, show error
+echo "❌ Error: Unable to run Package Installer CLI" >&2
+echo "Neither cli-with-packages.js nor dist/index.js found" >&2
+exit 1

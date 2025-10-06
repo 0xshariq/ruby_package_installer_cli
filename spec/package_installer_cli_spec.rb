@@ -8,10 +8,16 @@ RSpec.describe PackageInstallerCli do
   end
 
   describe ".run" do
-    it "checks for Node.js availability" do
-      allow(PackageInstallerCli).to receive(:system).with("node --version > /dev/null 2>&1").and_return(false)
-      
-      expect { PackageInstallerCli.run([]) }.to output(/Node.js is required/).to_stdout.and raise_error(SystemExit)
+    it "shows help by default" do
+      expect { PackageInstallerCli.run([]) }.to output(/Package Installer CLI/).to_stdout
+    end
+    
+    it "shows version when requested" do
+      expect { PackageInstallerCli.run(['--version']) }.to output(/Package Installer CLI v#{PackageInstallerCli::VERSION}/).to_stdout
+    end
+    
+    it "runs doctor command" do
+      expect { PackageInstallerCli.run(['doctor']) }.to output(/Running system diagnostics/).to_stdout
     end
   end
 end

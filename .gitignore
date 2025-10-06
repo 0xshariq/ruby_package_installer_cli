@@ -13,10 +13,7 @@
 .bundle/
 .byebug_history
 .rspec_status
-vendor/bundle/
-
-# Node.js specific
-node_modules/
+# vendor/bundle/ - Keep this for shipping bundled dependencies
 
 
 # IDE files
@@ -29,6 +26,7 @@ node_modules/
 # Build artifacts (but keep dist/ for the CLI)
 build/
 out/
+node_modules/
 
 # Package files
 *.tgz
