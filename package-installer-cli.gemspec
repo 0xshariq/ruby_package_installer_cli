@@ -10,6 +10,7 @@ Gem::Specification.new do |spec|
   spec.license       = "MIT"
   spec.required_ruby_version = ">= 2.6.0"
 
+  spec.metadata["source_url"] = "https://github.com/0xshariq/package-installer-cli"
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/0xshariq/ruby_package_installer_cli"
   spec.metadata["changelog_uri"] = "https://github.com/0xshariq/ruby_package_installer_cli/blob/main/CHANGELOG.md"
