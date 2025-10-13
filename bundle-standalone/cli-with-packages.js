@@ -51925,7 +51925,7 @@ async function createProjectFromTemplate(options) {
         if (projectName === '.') {
             projectPath = process.cwd();
             actualProjectName = external_path_.basename(process.cwd());
-            // Check if current directory is empty
+            // Check if current directory is empty (allow if user is already in intended dir)
             const currentDirContents = await fs_extra_lib.readdir(projectPath);
             if (currentDirContents.length > 0) {
                 const hasImportantFiles = currentDirContents.some(file => !file.startsWith('.') && file !== 'node_modules');
@@ -51958,8 +51958,56 @@ async function createProjectFromTemplate(options) {
         // Copy template files with filtering
         spinner.text = source/* default */.Ay.hex('#00d2d3')('Copying template files...');
         if (projectName === '.') {
-            // Copy files directly to current directory
-            await copyTemplateFilesToCurrentDir(templatePath, projectPath);
+            // If template has a single top-level directory, copy its contents into current dir
+            const nonSystemFiles = templateContents.filter(item => !item.startsWith('.') &&
+                item !== 'node_modules' &&
+                item !== 'dist' &&
+                item !== 'build');
+            if (nonSystemFiles.length === 1) {
+                const singleItem = nonSystemFiles[0];
+                const singleItemPath = external_path_.join(templatePath, singleItem);
+                const stats = await fs_extra_lib.stat(singleItemPath);
+                if (stats.isDirectory()) {
+                    await fs_extra_lib.copy(singleItemPath, projectPath, {
+                        filter: (src) => {
+                            const fileName = external_path_.basename(src);
+                            if (fileName === '.DS_Store' || fileName === 'Thumbs.db' || fileName === '.gitkeep')
+                                return false;
+                            const rel = external_path_.relative(singleItemPath, src);
+                            if (rel.split(external_path_.sep).includes('node_modules') || rel.split(external_path_.sep).includes('.git') || rel.split(external_path_.sep).includes('dist') || rel.split(external_path_.sep).includes('build') || rel.split(external_path_.sep).includes('.next'))
+                                return false;
+                            return true;
+                        }
+                    });
+                }
+                else {
+                    // Single file, just copy it
+                    await fs_extra_lib.copy(singleItemPath, external_path_.join(projectPath, singleItem));
+                }
+            }
+            else {
+                // Multiple items in template root, copy all to current dir
+                for (const item of templateContents) {
+                    const sourcePath = external_path_.join(templatePath, item);
+                    const destPath = external_path_.join(projectPath, item);
+                    const stats = await fs_extra_lib.stat(sourcePath);
+                    if (stats.isDirectory()) {
+                        if (item === 'node_modules' || item === '.git' || item === 'dist' || item === 'build' || item === '.next')
+                            continue;
+                        await fs_extra_lib.copy(sourcePath, destPath, {
+                            filter: (src) => {
+                                const fileName = external_path_.basename(src);
+                                return fileName !== '.DS_Store' && fileName !== 'Thumbs.db' && fileName !== '.gitkeep';
+                            }
+                        });
+                    }
+                    else {
+                        if (item === '.DS_Store' || item === 'Thumbs.db' || item === '.gitkeep')
+                            continue;
+                        await fs_extra_lib.copy(sourcePath, destPath);
+                    }
+                }
+            }
         }
         else {
             // Create directory and copy files
@@ -52046,20 +52094,46 @@ async function copyTemplateFiles(templatePath, projectPath) {
  * Copy template files to current directory (for "." project name)
  */
 async function copyTemplateFilesToCurrentDir(templatePath, projectPath) {
-    const templateContents = await fs_extra_lib.readdir(templatePath);
+    const templateContents = await fs.readdir(templatePath);
+    // Filter out system and unwanted files/directories
+    const nonSystemFiles = templateContents.filter(item => !item.startsWith('.') &&
+        item !== 'node_modules' &&
+        item !== 'dist' &&
+        item !== 'build');
+    // If the template has a single top-level directory, copy its contents into current dir
+    if (nonSystemFiles.length === 1) {
+        const singleItem = nonSystemFiles[0];
+        const singleItemPath = path.join(templatePath, singleItem);
+        const stats = await fs.stat(singleItemPath);
+        if (stats.isDirectory()) {
+            await fs.copy(singleItemPath, projectPath, {
+                filter: (src) => {
+                    const fileName = path.basename(src);
+                    if (fileName === '.DS_Store' || fileName === 'Thumbs.db' || fileName === '.gitkeep')
+                        return false;
+                    // Skip unwanted directories inside the template
+                    const rel = path.relative(singleItemPath, src);
+                    if (rel.split(path.sep).includes('node_modules') || rel.split(path.sep).includes('.git') || rel.split(path.sep).includes('dist') || rel.split(path.sep).includes('build') || rel.split(path.sep).includes('.next'))
+                        return false;
+                    return true;
+                }
+            });
+            return;
+        }
+    }
     for (const item of templateContents) {
-        const sourcePath = external_path_.join(templatePath, item);
-        const destPath = external_path_.join(projectPath, item);
-        const stats = await fs_extra_lib.stat(sourcePath);
+        const sourcePath = path.join(templatePath, item);
+        const destPath = path.join(projectPath, item);
+        const stats = await fs.stat(sourcePath);
         if (stats.isDirectory()) {
             // Skip common directories that shouldn't be copied
             if (item === 'node_modules' || item === '.git' ||
                 item === 'dist' || item === 'build' || item === '.next') {
                 continue;
             }
-            await fs_extra_lib.copy(sourcePath, destPath, {
+            await fs.copy(sourcePath, destPath, {
                 filter: (src) => {
-                    const fileName = external_path_.basename(src);
+                    const fileName = path.basename(src);
                     return fileName !== '.DS_Store' && fileName !== 'Thumbs.db' && fileName !== '.gitkeep';
                 }
             });
@@ -52069,7 +52143,7 @@ async function copyTemplateFilesToCurrentDir(templatePath, projectPath) {
             if (item === '.DS_Store' || item === 'Thumbs.db' || item === '.gitkeep') {
                 continue;
             }
-            await fs_extra_lib.copy(sourcePath, destPath);
+            await fs.copy(sourcePath, destPath);
         }
     }
 }
@@ -69028,7 +69102,7 @@ class AuthStore {
         if (!rec)
             throw new Error('User not found');
         if (rec.verified)
-            return true; // No limit for verified
+            return true; // No limit for verified users
         if (typeof rec.usageCount !== 'number')
             rec.usageCount = 0;
         if (typeof rec.usageLimit !== 'number')
@@ -69039,7 +69113,6 @@ class AuthStore {
         await this.save();
         return true;
     }
-    // Reset usage when user is verified
     async verifyUser(email, password) {
         const record = this.records.find(r => r.email === email.toLowerCase());
         if (!record)
@@ -69074,10 +69147,11 @@ class AuthStore {
     }
     async login(email, password) {
         const ok = await this.verifyUser(email, password);
-        if (!ok)
-            return false;
+        return !!ok;
+    }
+    // Create a session file for an already-verified authentication (does not verify password)
+    async createSession(email) {
         await fs_extra_lib.writeJson(this.sessionFile, { email: email.toLowerCase(), loggedAt: new Date().toISOString() }, { spaces: 2 });
-        return true;
     }
     async logout() {
         if (await fs_extra_lib.pathExists(this.sessionFile)) {
@@ -69114,10 +69188,6 @@ class AuthStore {
         if (!rec)
             throw new Error('User not found');
         rec.verified = verified;
-        if (verified) {
-            rec.usageCount = undefined;
-            rec.usageLimit = undefined;
-        }
         await this.save();
     }
     async getTotpSecret(email) {
@@ -69145,10 +69215,11 @@ var main = __webpack_require__(6273);
 
 
 
+
 async function setupTotp(email) {
     // Generate TOTP secret
     const secret = otplib.authenticator.generateSecret();
-    const otpauth = otplib.authenticator.keyuri(email, 'PackageInstallerCLI', secret);
+    const otpauth = otplib.authenticator.keyuri(email, 'Package-Installer-CLI', secret);
     // Show QR code in terminal
     console.log(source/* default */.Ay.cyan('\nScan this QR code with Google Authenticator or a compatible app:'));
     main.generate(otpauth, { small: true });
@@ -69183,7 +69254,7 @@ async function setupAndVerifyTotp(email) {
 async function interactiveRegister() {
     const { email, password, confirm } = await lib["default"].prompt([
         { name: 'email', message: 'Email:', type: 'input', validate: (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) || 'Enter a valid email' },
-        { name: 'password', message: 'Password (min 8 chars):', type: 'password', mask: '*', validate: (v) => v.length >= 8 || 'Password must be at least 8 characters' },
+        { name: 'password', message: 'Password (min 8 chars):', type: 'password', validate: (v) => v.length >= 8 || 'Password must be at least 8 characters' },
         { name: 'confirm', message: 'Confirm Password:', type: 'password', mask: '*' },
     ]);
     if (password !== confirm) {
@@ -69192,15 +69263,16 @@ async function interactiveRegister() {
     }
     let created = false;
     try {
+        console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.bold('Registering new user'), { padding: 1, borderColor: 'green' }));
         await authStore_authStore.createUser(email, password);
         created = true;
     }
     catch (err) {
         if (err.message && err.message.includes('already exists')) {
-            console.log(source/* default */.Ay.red('❌ User already exists. Please login or use a different email.'));
+            console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.red('User already exists. Please login or use a different email.'), { padding: 1, borderColor: 'red' }));
             return;
         }
-        console.log(source/* default */.Ay.red('❌'), err.message || String(err));
+        console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.red('Registration failed: ' + (err.message || String(err))), { padding: 1, borderColor: 'red' }));
         return;
     }
     // Suggest 2FA setup
@@ -69208,26 +69280,28 @@ async function interactiveRegister() {
         { name: 'enable2fa', type: 'confirm', message: 'Would you like to enable 2FA (recommended)?', default: true }
     ]);
     if (enable2fa) {
-        await setupAndVerifyTotp(email);
+        console.log(source/* default */.Ay.gray('Setting up 2FA...'));
+        const verified = await setupAndVerifyTotp(email);
+        if (!verified) {
+            console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.yellow('2FA setup incomplete. You can enable it later with: pi auth verify'), { padding: 1 }));
+        }
     }
     else {
-        console.log(source/* default */.Ay.yellow('⚠️  2FA is not enabled. You can enable it anytime with: pi auth verify'));
+        console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.yellow('⚠️  2FA is not enabled. You can enable it anytime with: pi auth verify'), { padding: 1 }));
     }
     // Always auto-login after registration if user was created
     if (created) {
-        const ok = await authStore_authStore.login(email, password);
-        if (ok) {
-            console.log(source/* default */.Ay.green('✅ User registered and logged in.'));
-        }
-        else {
-            console.log(source/* default */.Ay.yellow('User registered, but auto-login failed. Please login manually.'));
-        }
+        // Create session (auto-login)
+        await authStore_authStore.createSession(email);
+        console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.green('✅ Registered and logged in — welcome!'), { padding: 1, borderColor: 'green' }));
+        if (!enable2fa)
+            console.log(source/* default */.Ay.yellow('Note: 2FA not enabled. Enable with: pi auth verify'));
     }
 }
 async function interactiveLogin() {
     const responses = await inquirer.prompt([
         { name: 'email', message: 'Email:', type: 'input', validate: (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) || 'Enter a valid email' },
-        { name: 'password', message: 'Password:', type: 'password', mask: '*', validate: (v) => v.length >= 8 || 'Password must be at least 8 characters' },
+        { name: 'password', message: 'Password:', type: 'password', validate: (v) => v.length >= 8 || 'Password must be at least 8 characters' },
     ]);
     const { email, password } = responses;
     try {
@@ -69287,28 +69361,42 @@ async function handleAuthOptions(subcommand, value, opts = {}) {
                             console.log(source/* default */.Ay.red('❌ Invalid email or password'));
                             return;
                         }
-                        // Check verification
+                        // Check verification and handle totp provided for non-interactive flows
                         const secret = await authStore_authStore.getTotpSecret(opts.email);
                         const isVerified = await authStore_authStore.isVerified(opts.email);
                         if (!secret) {
                             console.log(source/* default */.Ay.red('❌ This account does not have 2FA set up. Please register again.'));
-                            await authStore_authStore.logout();
                             return;
                         }
                         if (!isVerified) {
-                            console.log(source/* default */.Ay.red('❌ This account is not verified. Please complete TOTP verification during registration.'));
-                            await authStore_authStore.logout();
+                            console.log(source/* default */.Ay.red('❌ This account is not verified. Please complete TOTP verification with: pi auth verify'));
                             return;
                         }
-                        // Prompt for TOTP code
-                        const { code } = await lib["default"].prompt([
-                            { name: 'code', message: 'Enter 6-digit code from your Authenticator app:', type: 'input', validate: (v) => /^\d{6}$/.test(v) || 'Enter a 6-digit code' }
-                        ]);
-                        if (!otplib.authenticator.check(code, secret)) {
-                            console.log(source/* default */.Ay.red('❌ Invalid code. Login aborted.'));
-                            await authStore_authStore.logout();
-                            return;
+                        // TOTP: allow up to 3 interactive attempts. If --totp provided, use it (single check).
+                        let code = opts.totp;
+                        if (code) {
+                            if (!otplib.authenticator.check(code, secret)) {
+                                console.log(source/* default */.Ay.red('❌ Invalid TOTP code provided. Login failed.'));
+                                return;
+                            }
                         }
+                        else {
+                            let ok = false;
+                            for (let i = 0; i < 3; ++i) {
+                                const resp = await lib["default"].prompt([{ name: 'code', message: 'Enter 6-digit code from your Authenticator app:', type: 'input', validate: (v) => /^\d{6}$/.test(v) || 'Enter a 6-digit code' }]);
+                                if (otplib.authenticator.check(resp.code, secret)) {
+                                    ok = true;
+                                    break;
+                                }
+                                console.log(source/* default */.Ay.red('❌ Invalid code. Try again.'));
+                            }
+                            if (!ok) {
+                                console.log(source/* default */.Ay.red('❌ Too many invalid attempts. Login failed.'));
+                                return;
+                            }
+                        }
+                        // Create session now that password and 2FA are verified
+                        await authStore_authStore.createSession(opts.email);
                         console.log(source/* default */.Ay.green('✅ Logged in successfully'));
                     }
                     catch (err) {
@@ -69335,22 +69423,27 @@ async function handleAuthOptions(subcommand, value, opts = {}) {
                     const isVerified = await authStore_authStore.isVerified(email);
                     if (!secret) {
                         console.log(source/* default */.Ay.red('❌ This account does not have 2FA set up. Please register again.'));
-                        await authStore_authStore.logout();
                         return;
                     }
                     if (!isVerified) {
-                        console.log(source/* default */.Ay.red('❌ This account is not verified. Please complete TOTP verification during registration.'));
-                        await authStore_authStore.logout();
+                        console.log(source/* default */.Ay.red('❌ This account is not verified. Please complete TOTP verification with: pi auth verify'));
                         return;
                     }
-                    const { code } = await lib["default"].prompt([
-                        { name: 'code', message: 'Enter 6-digit code from your Authenticator app:', type: 'input', validate: (v) => /^\d{6}$/.test(v) || 'Enter a 6-digit code' }
-                    ]);
-                    if (!otplib.authenticator.check(code, secret)) {
-                        console.log(source/* default */.Ay.red('❌ Invalid code. Login aborted.'));
-                        await authStore_authStore.logout();
+                    // Interactive login: allow up to 3 attempts
+                    let okTotp = false;
+                    for (let i = 0; i < 3; ++i) {
+                        const { code } = await lib["default"].prompt([{ name: 'code', message: 'Enter 6-digit code from your Authenticator app:', type: 'input', validate: (v) => /^\d{6}$/.test(v) || 'Enter a 6-digit code' }]);
+                        if (otplib.authenticator.check(code, secret)) {
+                            okTotp = true;
+                            break;
+                        }
+                        console.log(source/* default */.Ay.red('❌ Invalid code. Try again.'));
+                    }
+                    if (!okTotp) {
+                        console.log(source/* default */.Ay.red('❌ Too many invalid attempts. Login failed.'));
                         return;
                     }
+                    await authStore_authStore.createSession(email);
                     console.log(source/* default */.Ay.green('✅ Logged in successfully'));
                 }
                 return;
@@ -69358,27 +69451,26 @@ async function handleAuthOptions(subcommand, value, opts = {}) {
             case 'register': {
                 if (opts.email && opts.password) {
                     try {
+                        console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.bold('Registering new user'), { padding: 1, borderColor: 'green' }));
                         await authStore_authStore.createUser(opts.email, opts.password);
-                        // TOTP setup
-                        const secret = await setupTotp(opts.email);
-                        await authStore_authStore.setTotpSecret(opts.email, secret);
-                        const verified = await verifyTotpPrompt(secret);
-                        if (!verified) {
-                            console.log(source/* default */.Ay.red('❌ Verification failed. Registration incomplete.'));
-                            return;
+                        // Suggest 2FA setup flow same as interactive
+                        if (opts.enable2fa || opts.enable2fa === undefined) {
+                            const secret = await setupTotp(opts.email);
+                            await authStore_authStore.setTotpSecret(opts.email, secret);
+                            const verified = await verifyTotpPrompt(secret);
+                            if (!verified) {
+                                console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.yellow('2FA verification failed. Registration saved but 2FA incomplete.'), { padding: 1 }));
+                                await authStore_authStore.createSession(opts.email);
+                                return;
+                            }
+                            await authStore_authStore.setVerified(opts.email, true);
                         }
-                        await authStore_authStore.setVerified(opts.email, true);
-                        // Auto-login after registration
-                        const ok = await authStore_authStore.login(opts.email, opts.password);
-                        if (ok) {
-                            console.log(source/* default */.Ay.green('✅ User registered, verified, and logged in.'));
-                        }
-                        else {
-                            console.log(source/* default */.Ay.yellow('User registered and verified, but auto-login failed. Please login manually.'));
-                        }
+                        // Create session
+                        await authStore_authStore.createSession(opts.email);
+                        console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.green('✅ User registered and logged in.'), { padding: 1, borderColor: 'green' }));
                     }
                     catch (err) {
-                        console.log(source/* default */.Ay.red('❌'), err.message || String(err));
+                        console.log((0,node_modules_boxen/* default */.A)(source/* default */.Ay.red('Registration failed: ' + (err.message || String(err))), { padding: 1, borderColor: 'red' }));
                     }
                 }
                 else {
@@ -69590,23 +69682,21 @@ dist_program.hook('preAction', async (thisCommand, actionCommand) => {
         console.log(source/* default */.Ay.gray(`Run: pi auth --help to see authentication options`));
         process.exit(1);
     }
-    // 2FA enforcement and usage limit for unverified users
+    // Previously there were additional 2FA/usage checks here. Per request, only enforce login at preAction.
+    // Enforce usage limit for unverified users: allow auth verify/logout/help/version
     const session = await authStore_authStore.getSession();
     if (session && session.email) {
         const isVerified = await authStore_authStore.isVerified(session.email);
-        // Allow verify, logout, help for unverified users
-        const authSub = argv[1] || '';
         if (!isVerified) {
+            const authSub = argv[1] || '';
             if (name === 'auth' && ['verify', 'logout', '', undefined].includes(authSub))
                 return;
-            // Usage limit enforcement for unverified users
-            const allowed = await authStore_authStore.incrementUsage(session.email).catch(() => false);
-            if (!allowed) {
+            const allowedUsage = await authStore_authStore.incrementUsage(session.email).catch(() => false);
+            if (!allowedUsage) {
                 console.log('\n' + source/* default */.Ay.red('❌ You have reached the maximum number of allowed commands as an unverified user.'));
                 console.log(source/* default */.Ay.yellow('Please verify your account with: pi auth verify'));
                 process.exit(1);
             }
-            // Show warning for unverified users
             console.log(source/* default */.Ay.yellow('⚠️  Your account is not verified. You have limited access until you complete 2FA.'));
         }
     }
@@ -69737,6 +69827,7 @@ dist_program
     .argument('[value]', 'Optional value for subcommand (not used)')
     .option('--email <email>', 'Email for login/register')
     .option('--password <password>', 'Password for login/register')
+    .option('--totp <code>', 'TOTP code for non-interactive login')
     .option('-h, --help', 'Show help for auth command')
     .allowUnknownOption(true)
     .on('--help', () => { showAuthHelp(); })
