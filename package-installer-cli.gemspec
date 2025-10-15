@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name          = "package-installer-cli"
-  spec.version       = "2.2.0"
+  spec.version       = "2.3.0"
   spec.authors       = ["sharique"]
   spec.email         = ["khanshariq92213@gmail.com"]
 
@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
   spec.metadata["bug_tracker_uri"] = "https://github.com/0xshariq/ruby_package_installer_cli/issues"
 
   # No extensions needed - all dependencies are bundled
-  
+
 
   # Specify which files should be added to the gem when it is released.
   spec.files = Dir.glob([
