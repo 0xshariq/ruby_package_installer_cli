@@ -667,7 +667,7 @@ function generateBanner() {
 function generateVersionBanner() {
     const version = (0,_utils_js__WEBPACK_IMPORTED_MODULE_3__/* .getPackageVersion */ .RB)();
     return (0,boxen__WEBPACK_IMPORTED_MODULE_2__/* ["default"] */ .A)(chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#00d2d3')('📦 Version: ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#ffa502')(`v${version}`) +
-        chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#95afc0')('  •  ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#00d2d3')('🎯 Frameworks: ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#ffa502')('12+') +
+        chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#95afc0')('  •  ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#00d2d3')('🎯 Frameworks: ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#ffa502')('75') +
         chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#95afc0')('  •  ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#00d2d3')('📋 Templates: ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#ffa502')('50+') +
         chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#95afc0')('  •  ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#00d2d3')('⚡ Status: ') + chalk__WEBPACK_IMPORTED_MODULE_0__/* ["default"] */ .Ay.hex('#10ac84')('Ready to scaffold!'), {
         padding: { top: 0, bottom: 0, left: 2, right: 2 },
@@ -51392,6 +51392,282 @@ var lib = __webpack_require__(6824);
 var fs_extra_lib = __webpack_require__(7187);
 // EXTERNAL MODULE: ./dist/utils/pathResolver.js
 var pathResolver = __webpack_require__(3294);
+;// ./dist/utils/templateResolver.js
+/**
+ * Template path resolution utilities for Package Installer CLI v3.2.0
+ * Handles template name generation and path resolution based on template.json
+ */
+
+
+
+// Helper functions to read template.json
+function templateResolver_getTemplateConfig() {
+    const cliDir = (0,pathResolver/* getCliRootPath */.mw)();
+    const templatePath = external_path_.join(cliDir, '/templates/template.json');
+    if (!fs_extra_lib.existsSync(templatePath)) {
+        throw new Error(`template.json not found at: ${templatePath}`);
+    }
+    return JSON.parse(fs_extra_lib.readFileSync(templatePath, 'utf-8'));
+}
+// Export getTemplateConfig for other modules to reuse
+
+function templateResolver_getFrameworkConfig(framework) {
+    const config = templateResolver_getTemplateConfig();
+    // New template.json structure groups frameworks under top-level categories
+    for (const categoryKey of Object.keys(config)) {
+        const cat = config[categoryKey];
+        if (cat && typeof cat === 'object' && Object.prototype.hasOwnProperty.call(cat, framework)) {
+            return cat[framework];
+        }
+    }
+    return undefined;
+}
+// Export for use in other modules
+
+/**
+ * Generate template name based on framework options - use exact template names from template.json
+ * Only generates for frameworks that HAVE options
+ */
+function generateTemplateName(framework, options) {
+    const config = templateResolver_getFrameworkConfig(framework);
+    // Only generate template names for frameworks that have options
+    if (!config?.options && !config?.ui && !config?.bundlers) {
+        return '';
+    }
+    // If framework has predefined templates, select the matching one based on options
+    if (config.templates && config.templates.length > 0) {
+        // Build template name based on selected options
+        const parts = [];
+        // Handle src option (only for nextjs and reactjs)
+        if ((framework === 'nextjs' || framework === 'reactjs') && config.options?.includes('src')) {
+            if (options.src) {
+                parts.push('src');
+            }
+            else {
+                parts.push('no-src');
+            }
+        }
+        // Handle UI library - only add if actually selected (not "none")
+        // When UI is "none", templates simply omit the UI part from their names
+        if (config.ui && config.ui.length > 0) {
+            if (options.ui && options.ui !== 'none') {
+                parts.push(options.ui);
+            }
+            // For "none" selection, don't add any UI part to the template name
+        }
+        // Handle tailwind option
+        if (config.options?.includes('tailwind')) {
+            if (options.tailwind) {
+                parts.push('tailwind');
+            }
+            else {
+                parts.push('no-tailwind');
+            }
+        }
+        const generatedName = parts.join('-') + '-template';
+        // Find exact match in templates array
+        const exactMatch = config.templates.find((template) => template === generatedName);
+        if (exactMatch) {
+            return exactMatch;
+        }
+        // If no exact match, return the first template as fallback
+        return config.templates[0];
+    }
+    return '';
+}
+/**
+ * Resolve template directory path based on framework and template name
+ */
+function resolveTemplatePath(projectInfo) {
+    const { framework, language, templateName } = projectInfo;
+    const templatesRoot = (0,pathResolver/* getTemplatesPath */.vD)();
+    // Helper: find category that contains the framework
+    function findCategoryForFramework(frameworkName) {
+        const config = templateResolver_getTemplateConfig();
+        for (const categoryKey of Object.keys(config)) {
+            const cat = config[categoryKey];
+            if (cat && typeof cat === 'object' && Object.prototype.hasOwnProperty.call(cat, frameworkName)) {
+                return categoryKey;
+            }
+        }
+        return null;
+    }
+    // Combination templates are stored under a special category (e.g., combination-templates)
+    if (framework.includes('+')) {
+        const frameworkDir = framework.replace(/\+/g, '-');
+        const combCategory = 'combination-templates';
+        const combinationPath = external_path_.join(templatesRoot, combCategory, frameworkDir);
+        if (fs_extra_lib.existsSync(combinationPath)) {
+            if (language) {
+                const langPath = external_path_.join(combinationPath, language);
+                if (fs_extra_lib.existsSync(langPath)) {
+                    if (templateName) {
+                        const templatePath = external_path_.join(langPath, templateName);
+                        if (fs_extra_lib.existsSync(templatePath))
+                            return templatePath;
+                    }
+                    return langPath;
+                }
+            }
+            if (templateName) {
+                const templatePath = external_path_.join(combinationPath, templateName);
+                if (fs_extra_lib.existsSync(templatePath))
+                    return templatePath;
+            }
+            return combinationPath;
+        }
+    }
+    // Regular frameworks
+    const category = findCategoryForFramework(framework);
+    let baseFrameworkPath = external_path_.join(templatesRoot, framework); // default fallback
+    if (category) {
+        baseFrameworkPath = external_path_.join(templatesRoot, category, framework);
+        // If the expected folder doesn't exist on disk (config/fs mismatch), try scanning categories
+        if (!fs_extra_lib.existsSync(baseFrameworkPath)) {
+            const topLevelItems = fs_extra_lib.readdirSync(templatesRoot, { withFileTypes: true });
+            for (const dirent of topLevelItems) {
+                if (!dirent.isDirectory())
+                    continue;
+                const candidate = external_path_.join(templatesRoot, dirent.name, framework);
+                if (fs_extra_lib.existsSync(candidate)) {
+                    baseFrameworkPath = candidate;
+                    break;
+                }
+            }
+        }
+    }
+    else {
+        // Fallback 1: try to find the framework directory under any category on disk
+        let found = false;
+        const topLevelItems = fs_extra_lib.readdirSync(templatesRoot, { withFileTypes: true });
+        for (const dirent of topLevelItems) {
+            if (!dirent.isDirectory())
+                continue;
+            const candidate = external_path_.join(templatesRoot, dirent.name, framework);
+            if (fs_extra_lib.existsSync(candidate)) {
+                baseFrameworkPath = candidate;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            // keep default baseFrameworkPath (top-level legacy location)
+        }
+    }
+    // If a language-specific folder exists, prefer it
+    // Use template.json config to resolve paths when available
+    const fwConfig = templateResolver_getFrameworkConfig(framework);
+    if (fwConfig) {
+        const templatesEntry = fwConfig.templates;
+        // Helper to test candidate paths
+        const testCandidates = (candidates) => {
+            for (const c of candidates) {
+                if (fs_extra_lib.existsSync(c))
+                    return c;
+            }
+            return null;
+        };
+        // If templates is an object keyed by language
+        if (templatesEntry && typeof templatesEntry === 'object' && !Array.isArray(templatesEntry)) {
+            // templatesEntry is like { "typescript": ["a","b"], "javascript": [...] }
+            const langKey = language || Object.keys(templatesEntry)[0];
+            const list = templatesEntry[langKey] || templatesEntry[Object.keys(templatesEntry)[0]] || [];
+            if (templateName && list.includes(templateName)) {
+                // Prefer language folder then direct
+                const candidates = [
+                    external_path_.join(baseFrameworkPath, langKey, templateName),
+                    external_path_.join(baseFrameworkPath, templateName)
+                ];
+                const found = testCandidates(candidates);
+                if (found)
+                    return found;
+            }
+            // If no specific templateName, prefer language folder if exists
+            const langDir = external_path_.join(baseFrameworkPath, langKey);
+            if (fs_extra_lib.existsSync(langDir))
+                return langDir;
+            // fallback to first template folder for any language
+            const anyTemplate = list[0];
+            if (anyTemplate) {
+                const candidates = [
+                    external_path_.join(baseFrameworkPath, langKey, anyTemplate),
+                    external_path_.join(baseFrameworkPath, anyTemplate)
+                ];
+                const found = testCandidates(candidates);
+                if (found)
+                    return found;
+            }
+        }
+        // If templates is an array
+        if (Array.isArray(templatesEntry)) {
+            if (templateName && templatesEntry.includes(templateName)) {
+                const candidates = [
+                    external_path_.join(baseFrameworkPath, language || '', templateName),
+                    external_path_.join(baseFrameworkPath, templateName)
+                ];
+                const found = testCandidates(candidates);
+                if (found)
+                    return found;
+            }
+            // if no templateName, prefer language subdir if it exists
+            if (language) {
+                const langDir = external_path_.join(baseFrameworkPath, language);
+                if (fs_extra_lib.existsSync(langDir))
+                    return langDir;
+            }
+            // fallback to first template folder if it exists
+            const first = templatesEntry[0];
+            if (first) {
+                const candidates = [
+                    external_path_.join(baseFrameworkPath, language || '', first),
+                    external_path_.join(baseFrameworkPath, first)
+                ];
+                const found = testCandidates(candidates);
+                if (found)
+                    return found;
+            }
+        }
+        // If templates not declared or nothing matched, prefer language dir if exists
+        if (language) {
+            const langDir = external_path_.join(baseFrameworkPath, language);
+            if (fs_extra_lib.existsSync(langDir))
+                return langDir;
+        }
+        // Direct templateName fallback
+        if (templateName) {
+            const candidate = external_path_.join(baseFrameworkPath, templateName);
+            if (fs_extra_lib.existsSync(candidate))
+                return candidate;
+        }
+        // finally, return baseFrameworkPath (may or may not exist)
+        return baseFrameworkPath;
+    }
+    // If no fwConfig available, fallback to previously implemented resolution (language dir, templateName, base)
+    if (language) {
+        const langDir = external_path_.join(baseFrameworkPath, language);
+        if (fs_extra_lib.existsSync(langDir)) {
+            if (templateName) {
+                const candidate = external_path_.join(langDir, templateName);
+                if (fs_extra_lib.existsSync(candidate))
+                    return candidate;
+            }
+            return langDir;
+        }
+    }
+    if (templateName) {
+        const candidate = external_path_.join(baseFrameworkPath, templateName);
+        if (fs_extra_lib.existsSync(candidate))
+            return candidate;
+    }
+    return baseFrameworkPath;
+}
+/**
+ * Check if template directory exists
+ */
+function templateExists(templatePath) {
+    return fs_extra_lib.existsSync(templatePath) && fs_extra_lib.statSync(templatePath).isDirectory();
+}
+
 ;// ./dist/utils/prompts.js
 /**
  * User interaction prompts for Package Installer CLI v3.2.0
@@ -51402,29 +51678,89 @@ var pathResolver = __webpack_require__(3294);
 
 
 
-// Helper functions to read template.json
-function getTemplateConfig() {
-    const cliDir = (0,pathResolver/* getCliRootPath */.mw)();
-    const templatePath = external_path_.join(cliDir, 'template.json');
-    if (!fs_extra_lib.existsSync(templatePath)) {
-        throw new Error(`template.json not found at: ${templatePath}`);
+// Reuse centralized getTemplateConfig from templateResolver
+function getAvailableFrameworks(typeFilter) {
+    const config = getTemplateConfig();
+    const frameworks = [];
+    // template.json groups frameworks by top-level categories
+    for (const categoryKey of Object.keys(config)) {
+        const cat = config[categoryKey];
+        if (cat && typeof cat === 'object') {
+            for (const fw of Object.keys(cat)) {
+                // If a typeFilter is provided, check the framework's declared 'type' or the category key
+                if (typeFilter) {
+                    const fwConfig = cat[fw];
+                    const declaredType = (fwConfig && fwConfig.type) || categoryKey;
+                    if (declaredType === typeFilter) {
+                        frameworks.push(fw);
+                    }
+                }
+                else {
+                    frameworks.push(fw);
+                }
+            }
+        }
     }
-    return JSON.parse(fs_extra_lib.readFileSync(templatePath, 'utf-8'));
+    return frameworks;
 }
-function getAvailableFrameworks() {
+/**
+ * Return a list of unique 'type' values available in template.json (e.g., 'mobile','desktop','frontend')
+ */
+function getAvailableTypes() {
     const config = getTemplateConfig();
-    return Object.keys(config.frameworks);
+    const types = new Set();
+    for (const categoryKey of Object.keys(config)) {
+        const cat = config[categoryKey];
+        if (cat && typeof cat === 'object') {
+            for (const fw of Object.keys(cat)) {
+                const fwConfig = cat[fw];
+                if (fwConfig && fwConfig.type) {
+                    types.add(fwConfig.type);
+                }
+                else {
+                    // fallback to top-level category as type
+                    types.add(categoryKey);
+                }
+            }
+        }
+    }
+    // Filter out types that should not be shown to the user
+    const blacklist = new Set(['api', 'frontend', 'backend', 'fullstack']);
+    return Array.from(types).filter(t => !blacklist.has(String(t).toLowerCase())).sort();
 }
-function getFrameworkConfig(framework) {
-    const config = getTemplateConfig();
-    return config.frameworks[framework];
+// `getFrameworkConfig` is provided by `templateResolver.ts` and imported above.
+function getCategories() {
+    const config = templateResolver_getTemplateConfig();
+    return Object.keys(config);
+}
+function getFrameworksForCategory(category) {
+    const config = templateResolver_getTemplateConfig();
+    const cat = config[category];
+    if (!cat || typeof cat !== 'object')
+        return [];
+    return Object.keys(cat);
 }
 function getFrameworkDescription(framework) {
-    const config = getFrameworkConfig(framework);
+    const config = templateResolver_getFrameworkConfig(framework);
     return config?.description || 'Modern framework';
 }
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
+}
+// Human-friendly display names for types/categories
+const DISPLAY_NAME_MAP = {
+    'c++_c': 'C++/C',
+    'combination-templates': 'Combination Templates',
+    'javascript': 'JavaScript',
+    'go': 'Go',
+    'mobile': 'Mobile',
+    'desktop': 'Desktop',
+    'rust': 'Rust',
+    'python': 'Python',
+    'ruby': 'Ruby'
+};
+function displayTypeName(key) {
+    return DISPLAY_NAME_MAP[key] || capitalize(key.replace(/[-_]/g, ' '));
 }
 /**
  * Project name prompt with enhanced styling
@@ -51461,7 +51797,28 @@ async function promptProjectName() {
  * Framework selection prompt with enhanced styling
  */
 async function promptFrameworkSelection() {
-    const frameworks = getAvailableFrameworks();
+    // First prompt: category selection (top-level keys from template.json)
+    const categories = getCategories();
+    console.log(source/* default */.Ay.hex('#00d2d3')('\n🚀 Choose a category\n'));
+    const { category } = await lib["default"].prompt([
+        {
+            type: 'list',
+            name: 'category',
+            message: `${source/* default */.Ay.blue('❯')} Choose a category:`,
+            choices: categories.map(cat => ({
+                name: `${source/* default */.Ay.green('●')} ${source/* default */.Ay.bold(displayTypeName(cat))}`,
+                value: cat,
+                short: displayTypeName(cat)
+            })),
+            pageSize: 12
+        }
+    ]);
+    // Then prompt frameworks within the selected category
+    const frameworks = getFrameworksForCategory(category);
+    if (!frameworks || frameworks.length === 0) {
+        console.log(source/* default */.Ay.yellow('⚠️  No frameworks found in selected category'));
+        return '';
+    }
     console.log(source/* default */.Ay.hex('#00d2d3')('\n🚀 Framework Selection\n'));
     const { framework } = await lib["default"].prompt([
         {
@@ -51469,7 +51826,7 @@ async function promptFrameworkSelection() {
             name: 'framework',
             message: `${source/* default */.Ay.blue('❯')} Choose your framework:`,
             choices: frameworks.map(fw => ({
-                name: `${source/* default */.Ay.green('●')} ${source/* default */.Ay.bold(capitalize(fw))} ${source/* default */.Ay.gray('- ' + getFrameworkDescription(fw))}`,
+                name: `${source/* default */.Ay.green('●')} ${source/* default */.Ay.bold(capitalize(fw))} ${source/* default */.Ay.gray('- ' + (getFrameworkDescription(fw) || ''))}`,
                 value: fw,
                 short: capitalize(fw)
             })),
@@ -51482,7 +51839,7 @@ async function promptFrameworkSelection() {
  * Language selection prompt - framework specific from template.json
  */
 async function promptLanguageSelection(framework) {
-    const config = getFrameworkConfig(framework);
+    const config = templateResolver_getFrameworkConfig(framework);
     if (!config.languages || config.languages.length <= 1) {
         const defaultLang = config.languages?.[0] || 'javascript';
         console.log(source/* default */.Ay.cyan(`💻 Using ${source/* default */.Ay.bold(defaultLang)} as default language`));
@@ -51514,36 +51871,88 @@ async function promptLanguageSelection(framework) {
 /**
  * Template selection with enhanced styling
  */
-async function promptTemplateSelection(framework) {
-    const config = getFrameworkConfig(framework);
+async function promptTemplateSelection(framework, language) {
+    const config = templateResolver_getFrameworkConfig(framework);
     if (!config || !config.templates) {
         return '';
     }
-    if (config.templates.length === 1) {
-        console.log(source/* default */.Ay.cyan(`📋 Using ${source/* default */.Ay.bold(config.templates[0])} template`));
-        return config.templates[0];
-    }
-    console.log(source/* default */.Ay.hex('#00d2d3')('\n📋 Template Selection\n'));
-    const { template } = await lib["default"].prompt([
-        {
-            type: 'list',
-            name: 'template',
-            message: `${source/* default */.Ay.blue('❯')} Choose a template for ${source/* default */.Ay.bold(framework)}:`,
-            choices: config.templates.map((template) => ({
-                name: `${source/* default */.Ay.green('▸')} ${template.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}`,
-                value: template,
-                short: template
-            })),
-            pageSize: 8
+    const templatesEntry = config.templates;
+    // If templates is an array
+    if (Array.isArray(templatesEntry)) {
+        if (templatesEntry.length === 1) {
+            console.log(source/* default */.Ay.cyan(`📋 Using ${source/* default */.Ay.bold(templatesEntry[0])} template`));
+            return templatesEntry[0];
         }
-    ]);
-    return template;
+        console.log(source/* default */.Ay.hex('#00d2d3')('\n📋 Template Selection\n'));
+        const { template } = await lib["default"].prompt([
+            {
+                type: 'list',
+                name: 'template',
+                message: `${source/* default */.Ay.blue('❯')} Choose a template for ${source/* default */.Ay.bold(framework)}:`,
+                choices: templatesEntry.map((template) => ({
+                    name: `${source/* default */.Ay.green('▸')} ${template.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}`,
+                    value: template,
+                    short: template
+                })),
+                pageSize: 8
+            }
+        ]);
+        return template;
+    }
+    // If templates is an object keyed by language
+    if (typeof templatesEntry === 'object') {
+        const langKey = language || Object.keys(templatesEntry)[0];
+        const list = templatesEntry[langKey] || [];
+        if (list.length === 0) {
+            // Fallback: flatten all templates across languages
+            const flattenedAny = Object.values(templatesEntry).flat();
+            const flattened = flattenedAny.map(String);
+            if (flattened.length === 0)
+                return '';
+            console.log(source/* default */.Ay.hex('#00d2d3')('\n📋 Template Selection\n'));
+            const unique = Array.from(new Set(flattened));
+            const { template } = await lib["default"].prompt([
+                {
+                    type: 'list',
+                    name: 'template',
+                    message: `${source/* default */.Ay.blue('❯')} Choose a template for ${source/* default */.Ay.bold(framework)}:`,
+                    choices: unique.map((template) => ({
+                        name: `${source/* default */.Ay.green('▸')} ${template.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}`,
+                        value: template,
+                        short: template
+                    })),
+                    pageSize: 8
+                }
+            ]);
+            return template;
+        }
+        if (list.length === 1) {
+            console.log(source/* default */.Ay.cyan(`📋 Using ${source/* default */.Ay.bold(list[0])} template`));
+            return list[0];
+        }
+        console.log(source/* default */.Ay.hex('#00d2d3')('\n📋 Template Selection\n'));
+        const { template } = await lib["default"].prompt([
+            {
+                type: 'list',
+                name: 'template',
+                message: `${source/* default */.Ay.blue('❯')} Choose a template for ${source/* default */.Ay.bold(framework)} (${source/* default */.Ay.bold(langKey)}):`,
+                choices: list.map((template) => ({
+                    name: `${source/* default */.Ay.green('▸')} ${template.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}`,
+                    value: template,
+                    short: template
+                })),
+                pageSize: 8
+            }
+        ]);
+        return template;
+    }
+    return '';
 }
 /**
  * Framework options prompt - handles UI, bundlers, and other options
  */
 async function promptFrameworkOptions(framework) {
-    const config = getFrameworkConfig(framework);
+    const config = templateResolver_getFrameworkConfig(framework);
     if (!config || (!config.ui && !config.options && !config.bundlers)) {
         return {};
     }
@@ -51722,15 +52131,15 @@ async function promptFeatureProvider(category, framework) {
  * Helper functions to check framework capabilities
  */
 function hasFrameworkOptions(framework) {
-    const config = getFrameworkConfig(framework);
+    const config = templateResolver_getFrameworkConfig(framework);
     return !!(config?.options && config.options.length > 0);
 }
 function hasUIOptions(framework) {
-    const config = getFrameworkConfig(framework);
+    const config = templateResolver_getFrameworkConfig(framework);
     return !!(config?.ui && config.ui.length > 0);
 }
 function hasBundlerOptions(framework) {
-    const config = getFrameworkConfig(framework);
+    const config = templateResolver_getFrameworkConfig(framework);
     return !!(config?.bundlers && config.bundlers.length > 0);
 }
 function hasTemplateSelection(framework) {
@@ -51738,160 +52147,12 @@ function hasTemplateSelection(framework) {
     return !!(config?.templates && config.templates.length > 0);
 }
 function shouldShowTemplates(framework) {
-    const config = getFrameworkConfig(framework);
+    const config = templateResolver_getFrameworkConfig(framework);
     // Show templates ONLY for frameworks that have templates but NO options/ui/bundlers
     // Frameworks WITH options should generate template names based on user choices
     const hasOptions = !!(config?.options || config?.ui || config?.bundlers);
     const hasTemplates = !!(config?.templates && config.templates.length > 0);
     return hasTemplates && !hasOptions;
-}
-
-;// ./dist/utils/templateResolver.js
-/**
- * Template path resolution utilities for Package Installer CLI v3.2.0
- * Handles template name generation and path resolution based on template.json
- */
-
-
-
-// Helper functions to read template.json
-function templateResolver_getTemplateConfig() {
-    const cliDir = (0,pathResolver/* getCliRootPath */.mw)();
-    const templatePath = external_path_.join(cliDir, 'template.json');
-    if (!fs_extra_lib.existsSync(templatePath)) {
-        throw new Error(`template.json not found at: ${templatePath}`);
-    }
-    return JSON.parse(fs_extra_lib.readFileSync(templatePath, 'utf-8'));
-}
-function templateResolver_getFrameworkConfig(framework) {
-    const config = templateResolver_getTemplateConfig();
-    return config.frameworks[framework];
-}
-// Export for use in other modules
-
-/**
- * Generate template name based on framework options - use exact template names from template.json
- * Only generates for frameworks that HAVE options
- */
-function generateTemplateName(framework, options) {
-    const config = templateResolver_getFrameworkConfig(framework);
-    // Only generate template names for frameworks that have options
-    if (!config?.options && !config?.ui && !config?.bundlers) {
-        return '';
-    }
-    // If framework has predefined templates, select the matching one based on options
-    if (config.templates && config.templates.length > 0) {
-        // Build template name based on selected options
-        const parts = [];
-        // Handle src option (only for nextjs and reactjs)
-        if ((framework === 'nextjs' || framework === 'reactjs') && config.options?.includes('src')) {
-            if (options.src) {
-                parts.push('src');
-            }
-            else {
-                parts.push('no-src');
-            }
-        }
-        // Handle UI library - only add if actually selected (not "none")
-        // When UI is "none", templates simply omit the UI part from their names
-        if (config.ui && config.ui.length > 0) {
-            if (options.ui && options.ui !== 'none') {
-                parts.push(options.ui);
-            }
-            // For "none" selection, don't add any UI part to the template name
-        }
-        // Handle tailwind option
-        if (config.options?.includes('tailwind')) {
-            if (options.tailwind) {
-                parts.push('tailwind');
-            }
-            else {
-                parts.push('no-tailwind');
-            }
-        }
-        const generatedName = parts.join('-') + '-template';
-        // Find exact match in templates array
-        const exactMatch = config.templates.find((template) => template === generatedName);
-        if (exactMatch) {
-            return exactMatch;
-        }
-        // If no exact match, return the first template as fallback
-        return config.templates[0];
-    }
-    return '';
-}
-/**
- * Resolve template directory path based on framework and template name
- */
-function resolveTemplatePath(projectInfo) {
-    const { framework, language, templateName } = projectInfo;
-    const templatesRoot = (0,pathResolver/* getTemplatesPath */.vD)();
-    // Handle combination templates (like reactjs+expressjs+shadcn)
-    if (framework.includes('+')) {
-        const frameworkDir = framework.replace(/\+/g, '-');
-        const combinationPath = external_path_.join(templatesRoot, frameworkDir);
-        if (fs_extra_lib.existsSync(combinationPath)) {
-            // Check for language subdirectory
-            if (language) {
-                const langPath = external_path_.join(combinationPath, language);
-                if (fs_extra_lib.existsSync(langPath)) {
-                    // Check for specific template
-                    if (templateName) {
-                        const templatePath = external_path_.join(langPath, templateName);
-                        if (fs_extra_lib.existsSync(templatePath)) {
-                            return templatePath;
-                        }
-                    }
-                    return langPath;
-                }
-            }
-            return combinationPath;
-        }
-    }
-    // For frameworks with specific template names
-    if (templateName) {
-        // Check if language subdirectory exists and is required
-        const languageSubdirPath = external_path_.join(templatesRoot, framework, language || 'typescript');
-        if (fs_extra_lib.existsSync(languageSubdirPath)) {
-            const templatePath = external_path_.join(languageSubdirPath, templateName);
-            if (fs_extra_lib.existsSync(templatePath)) {
-                return templatePath;
-            }
-        }
-        // Otherwise, use direct framework directory with template name
-        const directTemplatePath = external_path_.join(templatesRoot, framework, templateName);
-        if (fs_extra_lib.existsSync(directTemplatePath)) {
-            return directTemplatePath;
-        }
-    }
-    // For frameworks with options but no specific template name, use language subdirectory if available
-    if (language) {
-        const languageSubdirPath = external_path_.join(templatesRoot, framework, language);
-        if (fs_extra_lib.existsSync(languageSubdirPath)) {
-            return languageSubdirPath;
-        }
-    }
-    // Default: use the framework directory directly
-    return external_path_.join(templatesRoot, framework);
-}
-/**
- * Check if template directory exists
- */
-function templateExists(templatePath) {
-    return fs_extra_lib.existsSync(templatePath) && fs_extra_lib.statSync(templatePath).isDirectory();
-}
-/**
- * Get all available templates for a framework
- */
-function getFrameworkTemplates(framework) {
-    const templatesRoot = getTemplatesPath();
-    const frameworkPath = path.join(templatesRoot, framework);
-    if (!fs.existsSync(frameworkPath)) {
-        return [];
-    }
-    return fs.readdirSync(frameworkPath, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name);
 }
 
 // EXTERNAL MODULE: external "child_process"
@@ -52535,7 +52796,7 @@ async function createProject(providedName, options) {
         let templateName = '';
         if (shouldShowTemplates(selectedFramework)) {
             // For frameworks WITHOUT options - show template selection list
-            templateName = await promptTemplateSelection(selectedFramework);
+            templateName = await promptTemplateSelection(selectedFramework, selectedLanguage);
         }
         else if (hasFrameworkOptions(selectedFramework) || hasUIOptions(selectedFramework) || hasBundlerOptions(selectedFramework)) {
             // For frameworks WITH options - generate template name from user choices
@@ -69589,6 +69850,36 @@ function showAuthHelp() {
     (0,helpFormatter/* createStandardHelp */.ht)(cfg);
 }
 
+;// ./dist/utils/timer.js
+const timers = {};
+function startTimer(key = 'default') {
+    timers[key] = { start: Date.now() };
+}
+function stopTimer(key = 'default') {
+    const rec = timers[key];
+    if (!rec)
+        return undefined;
+    rec.end = Date.now();
+    return rec.end - rec.start;
+}
+function getTimer(key = 'default') {
+    return timers[key];
+}
+function formatDuration(ms) {
+    if (ms === undefined)
+        return 'N/A';
+    if (ms < 1000)
+        return `${ms}ms`;
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    if (m > 0)
+        return `${m}m ${s % 60}s`;
+    return `${s}s`;
+}
+function nowIso() {
+    return new Date().toISOString();
+}
+
 ;// ./dist/index.js
 //#!/usr/bin/env node
 
@@ -69618,6 +69909,7 @@ globalThis.path = external_path_;
 
 
 // Import utilities
+
 
 
 
@@ -69666,6 +69958,10 @@ dist_program
 // Global preAction: enforce login for most commands, whitelist a few
 dist_program.hook('preAction', async (thisCommand, actionCommand) => {
     const name = actionCommand.name();
+    // start a timer for this command
+    startTimer(name);
+    // record user input time
+    actionCommand.__userInputTime = nowIso();
     // Commands allowed without login (help, version, auth, cache --help etc.)
     const allowed = ['auth', 'help', 'version', 'cache'];
     if (allowed.includes(name))
@@ -69699,6 +69995,20 @@ dist_program.hook('preAction', async (thisCommand, actionCommand) => {
             }
             console.log(source/* default */.Ay.yellow('⚠️  Your account is not verified. You have limited access until you complete 2FA.'));
         }
+    }
+});
+// postAction: stop timers and print execution times
+dist_program.hook('postAction', async (thisCommand, actionCommand) => {
+    const name = actionCommand.name();
+    try {
+        const durationMs = stopTimer(name);
+        const userInputTime = actionCommand.__userInputTime || 'N/A';
+        console.log('\n' + source/* default */.Ay.hex('#00d2d3')('⏱️  Command timing'));
+        console.log(`   ${source/* default */.Ay.gray('User input time:')} ${source/* default */.Ay.cyan(userInputTime)}`);
+        console.log(`   ${source/* default */.Ay.gray('Execution time:')} ${source/* default */.Ay.green(formatDuration(durationMs))}`);
+    }
+    catch (err) {
+        // ignore timing errors
     }
 });
 /**

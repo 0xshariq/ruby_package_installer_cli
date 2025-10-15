@@ -17,6 +17,7 @@ Gem::Specification.new do |spec|
   spec.metadata["bug_tracker_uri"] = "https://github.com/0xshariq/ruby_package_installer_cli/issues"
 
   # No extensions needed - all dependencies are bundled
+  
 
   # Specify which files should be added to the gem when it is released.
   spec.files = Dir.glob([
